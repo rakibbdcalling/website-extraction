@@ -1,5 +1,5 @@
-flask
+Flask
+Flask-Session
 requests
 beautifulsoup4
 pandas
-gunicorn
