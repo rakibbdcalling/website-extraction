@@ -1,3 +1,4 @@
+import os
 from flask import Flask, request, render_template, jsonify, session
 from flask_session import Session
 import requests
