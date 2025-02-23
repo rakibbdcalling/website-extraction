@@ -1,13 +1,38 @@
-from flask import Flask, request, render_template, jsonify
+from flask import Flask, request, render_template, jsonify, session
+from flask_session import Session
 import requests
 from bs4 import BeautifulSoup
 import re
 from urllib.parse import unquote
 import json
 import pandas as pd
-import os
 
 app = Flask(__name__)
+app.secret_key = "your_secret_key_here"  # Change this to a strong secret key
+app.config["SESSION_TYPE"] = "filesystem"
+Session(app)
+
+user_passwords = ["pass1", "pass2", "pass3"]
+
+@app.route('/')
+def index():
+    if session.get("authenticated"):
+        return render_template('index.html')
+    return render_template('password.html')  # Redirect to password input page
+
+@app.route('/login', methods=['POST'])
+def login():
+    data = request.json
+    if data.get("password") in user_passwords:
+        session["authenticated"] = True
+        return jsonify({"success": True})
+    return jsonify({"success": False, "message": "Invalid password"}), 401
+
+@app.route('/logout')
+def logout():
+    session.pop("authenticated", None)
+    return jsonify({"success": True, "message": "Logged out successfully"})
+
 
 CONTACT_KEYWORDS = ['contact', 'contact-us', 'contacts']
 BLACKLIST_EMAILS = [
@@ -132,10 +157,6 @@ def extract_phone_and_email(url):
 
     return extracted_data
 
-@app.route('/')
-def index():
-    return render_template('index.html')
-
 @app.route('/extract', methods=['POST'])
 def extract():
     url = request.json.get("url")
@@ -146,6 +167,4 @@ def extract():
     return jsonify(data)
 
 if __name__ == "__main__":
-    port = int(os.getenv("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
-
+    app.run(debug=True)
