@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Website Data Extractor</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <h1>Website Data Extractor</h1>
+
+    <form id="extractForm">
+        <textarea name="urls" id="urls" rows="5" placeholder="Enter websites (one per line)"></textarea>
+        <button type="submit">Extract Data</button>
+    </form>
+
+    <!-- Loading Message & Progress Bar -->
+    <p id="loadingMessage" style="display: none; font-weight: bold;"></p>
+    <progress id="progressBar" value="0" max="100" style="width: 100%; display: none;"></progress>
+    
+    <!-- Export Buttons -->
+    <div style="margin-top: 20px;">
+        <button id="exportJSON">Export as JSON</button>
+        <button id="exportCSV">Export as CSV</button>
+        <button id="exportExcel">Export as Excel</button>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Website</th>
+                <th>Phone</th>
+                <th>E-mail</th>
+                <th>Instagram</th>
+                <th>Facebook</th>
+                <th>YouTube</th>
+                <th>LinkedIn</th>
+                <th>Twitter/X</th>
+                <th>Tiktok</th>
+            </tr>
+        </thead>
+        <tbody id="results"></tbody>
+    </table>
+
+    <script>
+        let extractedData = [];  // This will store all extracted data
+
+        document.getElementById("extractForm").addEventListener("submit", async function(event) {
+            event.preventDefault();
+            document.getElementById("results").innerHTML = ""; // Clear previous results
+
+            const formData = new FormData(this);
+            const urls = formData.get("urls").split("\n").map(url => url.trim()).filter(url => url);
+            
+            const loadingMessage = document.getElementById("loadingMessage");
+            const progressBar = document.getElementById("progressBar");
+            let remaining = urls.length;
+            let total = urls.length;
+
+            if (remaining > 0) {
+                loadingMessage.style.display = "block";
+                progressBar.style.display = "block";
+                loadingMessage.innerText = `Processing... ${remaining} websites remaining`;
+                progressBar.value = 0;
+                progressBar.max = total;
+            }
+
+            for (const [index, url] of urls.entries()) {
+                try {
+                    const response = await fetch("/extract", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ url: url })
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        extractedData.push(data);  // Save the data
+                        const row = `<tr>
+                            <td>${data.website}</td>
+                            <td>${data.phone}</td>
+                            <td>${data.email}</td>
+                            <td>${data.social_media.instagram}</td>
+                            <td>${data.social_media.facebook}</td>
+                            <td>${data.social_media.youtube}</td>
+                            <td>${data.social_media.linkedin}</td>
+                            <td>${data.social_media.twitter}</td>
+                            <td>${data.social_media.tiktok}</td>
+                        </tr>`;
+                        document.getElementById("results").innerHTML += row;
+                    } else {
+                        console.error(`Error: ${response.statusText}`);
+                    }
+                } catch (err) {
+                    console.error("Request error:", err);
+                }
+
+                remaining--;
+                progressBar.value = total - remaining;
+                loadingMessage.innerText = `Processing... ${remaining} websites remaining`;
+            }
+
+            loadingMessage.style.display = "none";
+            progressBar.style.display = "none";
+
+            // Export the data automatically after 2 seconds
+            setTimeout(() => {
+                exportExcel();
+            }, 2000);
+        });
+
+        // Export data as Excel (using a simple library like SheetJS)
+        function exportExcel() {
+            const orderedData = extractedData.map(item => ({
+                Website: item.website,
+                Phone: item.phone,
+                E_mail: item.email,
+                Instagram: item.social_media.instagram,
+                Facebook: item.social_media.facebook,
+                YouTube: item.social_media.youtube,
+                LinkedIn: item.social_media.linkedin,
+                Twitter_X: item.social_media.twitter,
+                Tiktok: item.social_media.tiktok
+            }));
+
+            const wb = XLSX.utils.book_new();
+            const ws = XLSX.utils.json_to_sheet(orderedData);
+            XLSX.utils.book_append_sheet(wb, ws, 'Extracted Data');
+            XLSX.writeFile(wb, 'extracted_data.xlsx');
+        }
+
+        // Manually trigger Excel export
+        document.getElementById('exportExcel').addEventListener('click', function() {
+            exportExcel();
+        });
+
+        // Export data as JSON
+        document.getElementById('exportJSON').addEventListener('click', function() {
+            const dataStr = JSON.stringify(extractedData, null, 2);
+            const blob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'extracted_data.json';
+            a.click();
+        });
+
+        // Export data as CSV
+        document.getElementById('exportCSV').addEventListener('click', function() {
+            const csvRows = [];
+            const headers = ['Website', 'Phone', 'E-mail', 'Instagram', 'Facebook', 'YouTube', 'LinkedIn', 'Twitter/X', 'Tiktok'];
+            csvRows.push(headers.join(','));
+
+            extractedData.forEach(row => {
+                const values = [
+                    row.website,
+                    row.phone,
+                    row.email,
+                    row.social_media.instagram,
+                    row.social_media.facebook,
+                    row.social_media.youtube,
+                    row.social_media.linkedin,
+                    row.social_media.twitter,
+                    row.social_media.tiktok
+                ];
+
+                const escapedValues = values.map(value => {
+                    if (value && value.includes(',')) {
+                        return `"${value}"`;
+                    }
+                    return value;
+                });
+
+                csvRows.push(escapedValues.join(','));
+            });
+
+            const csvData = csvRows.join('\n');
+            const blob = new Blob([csvData], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'extracted_data.csv';
+            a.click();
+        });
+    </script>
+
+    <!-- Load SheetJS library for Excel export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.0/xlsx.full.min.js"></script>
+</body>
+</html>
