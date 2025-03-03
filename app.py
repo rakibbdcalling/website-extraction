@@ -13,7 +13,7 @@ app.secret_key = "your_secret_key_here"  # Change this to a strong secret key
 app.config["SESSION_TYPE"] = "filesystem"
 Session(app)
 
-user_passwords = ["pass1", "pass2", "pass3"]
+user_passwords = ["pass10", "pass20", "pass30"]
 
 @app.route('/')
 def index():
